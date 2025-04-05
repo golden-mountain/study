@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>李氏至香堂族谱</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #f9f5e9;
+        }
+        h1 {
+            color: #8b4513;
+            text-align: center;
+            border-bottom: 2px solid #8b4513;
+            padding-bottom: 10px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .search-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #search {
+            padding: 10px 15px;
+            width: 60%;
+            max-width: 500px;
+            border: 1px solid #8b4513;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .controls button {
+            background-color: #8b4513;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .family-tree {
+            margin: 20px 0;
+        }
+        .person {
+            margin: 8px 0;
+            padding: 8px;
+            border-left: 3px solid #d4a76a;
+        }
+        .person-name {
+            font-weight: bold;
+            color: #8b4513;
+            cursor: pointer;
+        }
+        .person-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 15px;
+        }
+        .children {
+            margin-left: 30px;
+            display: none;
+        }
+        .active {
+            display: block;
+        }
+        .highlight {
+            background-color: #fffacd;
+        }
+        .generation-marker {
+            background-color: #e8d8b8;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+        .female {
+            color: #ff69b4;
+        }
+        .search-results {
+            text-align: center;
+            margin: 10px 0;
+            color: #8b4513;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>李氏至香堂族谱</h1>
+        <div id="generations-header" class="header"></div>
+    </div>
+    
+    <div class="search-container">
+        <input type="text" id="search" placeholder="输入姓名、字辈、生卒年等信息搜索...">
+    </div>
+    
+    <div class="controls">
+        <button id="expand-all">展开全部</button>
+        <button id="collapse-all">折叠全部</button>
+        <button id="reset">重置搜索</button>
+    </div>
+    
+    <div id="search-results" class="search-results"></div>
+    
+    <div id="family-tree" class="family-tree"></div>
+
+    <script>
+        // 加载JSON数据
+        async function loadFamilyData() {
+            try {
+                const response = await fetch('li-family-tree.json');
+                return await response.json();
+            } catch (error) {
+                console.error('Error loading JSON file:', error);
+                return null;
+            }
+        }
+
+        // 渲染族谱树
+        function renderFamilyTree(data, container) {
+            // 显示字辈
+            const generationHeader = document.getElementById('generations-header');
+            generationHeader.innerHTML = `<strong>字辈：</strong>${data.generations}`;
+            
+            // 清空容器
+            container.innerHTML = '';
+            
+            // 渲染每个成员
+            data.members.forEach(member => {
+                renderMember(member, container);
+            });
+            
+            // 添加交互功能
+            addTreeInteractions();
+        }
+
+        // 渲染单个成员
+        function renderMember(member, parentElement, level = 0) {
+            const memberDiv = document.createElement('div');
+            memberDiv.className = 'person';
+            memberDiv.dataset.level = level;
+            
+            // 构建姓名显示
+            let nameHtml = `<span class="person-name">`;
+            
+            // 如果有子元素，添加展开/折叠图标
+            if (member.children && member.children.length > 0) {
+                nameHtml += `<span class="toggle-icon">+</span> `;
+            }
+            
+            nameHtml += `${member.name}`;
+            
+            // 添加字辈标记
+            if (member.generation) {
+                nameHtml += ` <span class="generation-marker">${member.generation}</span>`;
+            }
+            
+            // 添加别名和讳
+            if (member.details) {
+                if (member.details.alias) {
+                    nameHtml += ` (字:${member.details.alias})`;
+                }
+                if (member.details.given_name) {
+                    nameHtml += ` (讳:${member.details.given_name})`;
+                }
+            }
+            
+            nameHtml += `</span>`;
+            
+            // 添加详细信息
+            let detailsHtml = '';
+            if (member.details) {
+                detailsHtml += `<div class="person-details">`;
+                
+                if (member.details.rank) {
+                    detailsHtml += `<div><strong>排行:</strong> ${member.details.rank}</div>`;
+                }
+                if (member.details.birth) {
+                    detailsHtml += `<div><strong>生:</strong> ${member.details.birth}</div>`;
+                }
+                if (member.details.death) {
+                    detailsHtml += `<div><strong>殁:</strong> ${member.details.death}</div>`;
+                }
+                if (member.details.spouse) {
+                    detailsHtml += `<div><strong>配:</strong> ${member.details.spouse}</div>`;
+                }
+                if (member.details.tomb) {
+                    detailsHtml += `<div><strong>墓:</strong> ${member.details.tomb}</div>`;
+                }
+                if (member.details.position) {
+                    detailsHtml += `<div><strong>地:</strong> ${member.details.position}</div>`;
+                }
+                if (member.details.migration) {
+                    detailsHtml += `<div><strong>迁:</strong> ${member.details.migration}</div>`;
+                }
+                
+                detailsHtml += `</div>`;
+            }
+            
+            memberDiv.innerHTML = nameHtml + detailsHtml;
+            
+            // 如果有子元素，递归渲染
+            if (member.children && member.children.length > 0) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'children';
+                
+                member.children.forEach(child => {
+                    renderMember(child, childrenDiv, level + 1);
+                });
+                
+                memberDiv.appendChild(childrenDiv);
+            }
+            
+            parentElement.appendChild(memberDiv);
+        }
+
+        // 添加树形交互功能
+        function addTreeInteractions() {
+            // 展开/折叠功能
+            const names = document.querySelectorAll('.person-name');
+            names.forEach(name => {
+                name.addEventListener('click', function() {
+                    const children = this.parentElement.querySelector('.children');
+                    if (children) {
+                        children.classList.toggle('active');
+                        const icon = this.querySelector('.toggle-icon');
+                        if (icon) {
+                            icon.textContent = children.classList.contains('active') ? '-' : '+';
+                        }
+                    }
+                });
+            });
+
+            // 展开全部
+            document.getElementById('expand-all').addEventListener('click', function() {
+                const allChildren = document.querySelectorAll('.children');
+                const allIcons = document.querySelectorAll('.toggle-icon');
+                allChildren.forEach(child => {
+                    child.classList.add('active');
+                });
+                allIcons.forEach(icon => {
+                    icon.textContent = '-';
+                });
+            });
+
+            // 折叠全部
+            document.getElementById('collapse-all').addEventListener('click', function() {
+                const allChildren = document.querySelectorAll('.children');
+                const allIcons = document.querySelectorAll('.toggle-icon');
+                allChildren.forEach(child => {
+                    child.classList.remove('active');
+                });
+                allIcons.forEach(icon => {
+                    icon.textContent = '+';
+                });
+            });
+
+            // 搜索功能
+            const searchInput = document.getElementById('search');
+            const searchResults = document.getElementById('search-results');
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.trim().toLowerCase();
+                if (searchTerm === '') {
+                    removeHighlights();
+                    searchResults.textContent = '';
+                    return;
+                }
+                
+                let count = 0;
+                removeHighlights();
+                
+                // 搜索所有文本元素
+                const allTextElements = document.querySelectorAll('.person-name, .person-details');
+                allTextElements.forEach(element => {
+                    const text = element.textContent.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        element.innerHTML = element.textContent.replace(
+                            new RegExp(searchTerm, 'gi'), 
+                            match => `<span class="highlight">${match}</span>`
+                        );
+                        
+                        // 展开父元素
+                        let parent = element.closest('.person');
+                        while (parent) {
+                            const children = parent.querySelector('.children');
+                            if (children) {
+                                children.classList.add('active');
+                                const icon = parent.querySelector('.toggle-icon');
+                                if (icon) icon.textContent = '-';
+                            }
+                            parent = parent.parentElement.closest('.person');
+                        }
+                        
+                        count++;
+                    }
+                });
+                
+                searchResults.textContent = count > 0 ? 
+                    `找到 ${count} 个匹配项` : '没有找到匹配项';
+            });
+
+            // 重置搜索
+            document.getElementById('reset').addEventListener('click', function() {
+                searchInput.value = '';
+                removeHighlights();
+                searchResults.textContent = '';
+            });
+
+            function removeHighlights() {
+                const highlights = document.querySelectorAll('.highlight');
+                highlights.forEach(highlight => {
+                    highlight.outerHTML = highlight.innerHTML;
+                });
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            const familyData = await loadFamilyData();
+            if (familyData) {
+                renderFamilyTree(familyData, document.getElementById('family-tree'));
+            } else {
+                document.getElementById('family-tree').innerHTML = 
+                    '<p style="color:red; text-align:center;">加载族谱数据失败，请检查JSON文件</p>';
+            }
+        });
+    </script>
+</body>
+</html>
